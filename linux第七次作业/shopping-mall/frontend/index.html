@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>🛒 我的网上商城</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+        #app { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; gap: 20px; }
+        .product-list { flex: 2; display: flex; flex-wrap: wrap; gap: 15px; }
+        .product-card { border: 1px solid #ddd; padding: 15px; width: 180px; border-radius: 8px; text-align: center; background: #fff; }
+        .product-card button { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        .cart-side { flex: 1; border-left: 2px solid #eee; padding-left: 20px; background: #fafafa; border-radius: 8px; padding: 20px; }
+        .cart-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
+        .btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-success { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
+        h2 { margin-top: 0; }
+        .rec-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div style="width:100%; display:flex; flex-direction: column;">
+        <h1>🛍️ 数码商城</h1>
+        <div style="display: flex; gap: 20px;">
+            <div class="product-list">
+                <div class="product-card" v-for="p in products" :key="p.id">
+                    <img :src="p.image_url" style="width:100px; height:100px; object-fit:cover;">
+                    <h4>{{ p.name }}</h4>
+                    <p>¥{{ p.price }}</p>
+                    <button @click="addToCart(p.id)">➕ 加入购物车</button>
+                </div>
+            </div>
+            <div class="cart-side">
+                <h2>🛒 购物车</h2>
+                <div v-if="cart.length === 0">空空如也~</div>
+                <div class="cart-item" v-for="item in cart" :key="item.id">
+                    <span>{{ item.name }} x {{ item.quantity }}</span>
+                    <span>¥{{ (item.price * item.quantity).toFixed(2) }}
+                        <button class="btn-danger" @click="removeFromCart(item.id)">✕</button>
+                    </span>
+                </div>
+                <hr>
+                <h3>总计: ¥{{ cartTotal }}</h3>
+                <button class="btn-success" @click="checkout">📦 提交订单</button>
+                
+                <div class="rec-section">
+                    <button @click="getRecommend" style="background:#6f42c1; color:white; border:none; padding:5px 10px; border-radius:4px;">🤖 智能推荐 (MCP)</button>
+                    <div v-for="r in recommendations" :key="r.id" style="font-size:14px; padding:3px 0;">
+                        ✅ {{ r.name }} - ¥{{ r.price }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    var session_id = 'user_' + Math.random().toString(36).substr(2, 8);
+    console.log('当前会话:', session_id);
+
+    new Vue({
+        el: '#app',
+        data: {
+            products: [],
+            cart: [],
+            recommendations: []
+        },
+        mounted() {
+            this.fetchProducts();
+            this.fetchCart();
+        },
+        methods: {
+            async fetchProducts() {
+                const res = await fetch('http://localhost:5000/api/products');
+                this.products = await res.json();
+            },
+            async fetchCart() {
+                const res = await fetch(`http://localhost:5000/api/cart?session_id=${session_id}`);
+                this.cart = await res.json();
+            },
+            async addToCart(productId) {
+                await fetch('http://localhost:5000/api/cart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id, product_id: productId, quantity: 1})
+                });
+                this.fetchCart();
+                this.recommendations = [];
+            },
+            async removeFromCart(productId) {
+                await fetch(`http://localhost:5000/api/cart/${productId}?session_id=${session_id}`, {method: 'DELETE'});
+                this.fetchCart();
+                this.recommendations = [];
+            },
+            async checkout() {
+                const res = await fetch('http://localhost:5000/api/order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id})
+                });
+                const data = await res.json();
+                if (data.order_id) {
+                    alert(`✅ 订单提交成功！订单号: ${data.order_id}，总金额: ¥${data.total}`);
+                    this.fetchCart();
+                } else {
+                    alert('❌ 购物车是空的！');
+                }
+            },
+            async getRecommend() {
+                const res = await fetch(`http://localhost:5000/api/recommend?session_id=${session_id}`);
+                this.recommendations = await res.json();
+                if(this.recommendations.length === 0) alert('没有更多推荐了');
+            }
+        },
+        computed: {
+            cartTotal() {
+                return this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2);
+            }
+        }
+    });
+</script>
+</body>
+</html>
