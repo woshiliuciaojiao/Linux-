@@ -1,0 +1,23 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_qwen_task
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_model_data:/root/.ollama
+    restart: unless-stopped
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: mcp_proxy
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_model_data:
